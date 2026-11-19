@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b5e20">
+<title>Your Health Ally</title>
+<style>
+:root{font:16px/1.5 system-ui,sans-serif;color:#17291c;background:#f3f7f1;--green:#1b5e20;--line:#d8e4d5;--soft:#eaf3e6}
+*{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}a{color:var(--green)}header,nav{background:white;border-bottom:1px solid var(--line)}header>div,nav>div,main{max-width:1040px;margin:auto;padding:14px clamp(16px,4vw,36px)}header a{text-decoration:none;font-weight:850;font-size:1.2rem}main{padding-block:32px 100px}h1,h2,h3,p{margin-top:0}h1{font-size:clamp(2rem,5vw,3.4rem);letter-spacing:-.05em;line-height:1.05;margin-bottom:14px}h2{line-height:1.15;letter-spacing:-.025em}h3{margin-bottom:6px}.lead{color:#455949;max-width:55ch}.hero,.card,fieldset,details{background:white;border:1px solid var(--line);border-radius:20px;padding:20px}.hero{padding:clamp(24px,6vw,74px);background:linear-gradient(125deg,#fff,#dbebd4);margin-bottom:20px}.hero h1{font-size:clamp(3rem,9vw,6.5rem);max-width:8ch}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:12px;margin:14px 0 22px}.card p:last-child{margin-bottom:0}.card strong{display:block;font-size:1.6rem}.row,.tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.button,button{border:1px solid var(--green);border-radius:10px;padding:10px 16px;cursor:pointer;background:var(--green);color:white;font-weight:700;text-decoration:none;display:inline-block}.secondary,.tabs button{background:white;color:var(--green)}.tabs button[aria-pressed=true]{background:var(--green);color:white}.tabs{margin-bottom:18px}fieldset{margin:0 0 14px;min-width:0}legend{font-weight:750;padding:0 5px}.choice{display:inline-flex;gap:5px;border:1px solid var(--line);border-radius:9px;padding:7px 10px;margin:4px;cursor:pointer}.field{display:grid;gap:5px;margin-bottom:12px;max-width:440px}.field input,.field select{width:100%;padding:8px;border:1px solid #95aa97;border-radius:8px;background:white}.stack> *{margin-bottom:10px}details summary{cursor:pointer;font-weight:750}details p{margin:8px 0 0}nav{position:fixed;bottom:0;left:0;right:0;border-top:1px solid var(--line);border-bottom:0}nav>div{display:flex;justify-content:space-between;gap:4px}nav a{font-size:clamp(.73rem,2.5vw,1rem);text-decoration:none;padding:6px;border-radius:8px}nav a[aria-current=page]{background:var(--soft);font-weight:750}progress{width:100%;accent-color:var(--green)}.photo{width:100%;max-height:260px;object-fit:contain;border-radius:12px;margin-top:12px}.eyebrow{font-weight:800;color:var(--green);letter-spacing:.05em}.notice{background:var(--soft);padding:12px;border-radius:10px}.back{display:inline-block;margin-bottom:14px}.muted{color:#455949}[hidden]{display:none!important}:focus-visible{outline:3px solid #397c40;outline-offset:3px}
+</style>
+</head>
+<body>
+<header><div><a id="brand" href="#home">Your Health Ally</a></div></header>
+<main id="screen"></main>
+<nav id="navigation" aria-label="Main navigation" hidden></nav>
+<script>
+'use strict';
+const screen = document.querySelector('#screen');
+const navigation = document.querySelector('#navigation');
+const brand = document.querySelector('#brand');
+const defaults = {name:'Enzo',goal:'Maintain health',skin:[],diet:'No preference',calories:1218,steps:8432,water:1.8,weight:72,onboarded:false};
+const storageKey = 'your-health-ally-v1';
+let profile = {...defaults};
+try { profile = {...defaults,...JSON.parse(localStorage.getItem(storageKey) || '{}')}; } catch {}
+let photoUrl = '';
+const save = (values) => {
+  profile = {...profile,...values};
+  try { localStorage.setItem(storageKey,JSON.stringify(profile)); } catch {}
+};
+const escapeText = (value) => String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const link = (route,label,secondary=false) => `<a class="button ${secondary?'secondary':''}" href="#${route}">${label}</a>`;
+const card = (title,body) => `<article class="card"><h3>${title}</h3><p>${body}</p></article>`;
+const detail = (title,body) => `<details><summary>${title}</summary><p>${body}</p></details>`;
+const meter = (label,value,target,unit) => `<article class="card"><h3>${label}</h3><strong>${value.toLocaleString('en-GB')} ${unit}</strong><progress aria-label="${label}" value="${Math.min(value,target)}" max="${target}"></progress><small>Daily goal ${target.toLocaleString('en-GB')} ${unit}</small></article>`;
+const metricFields = () => [
+  ['calories','Calories (kcal)',1],['steps','Steps',1],['water','Water (L)',0.1],['weight','Weight (kg)',0.1]
+].map(([key,label,step])=>`<label class="field">${label}<input type="number" name="${key}" min="${key==='weight'?0.1:0}" step="${step}" value="${profile[key]}" required></label>`).join('');
+const track = () => `<div class="grid">${meter('Nutrition',profile.calories,2000,'kcal')}${meter('Steps',profile.steps,10000,'steps')}${meter('Water',profile.water,2.5,'L')}</div>`;
+const choices = (name,items,multi=false) => items.map(item=>{
+  const checked = multi ? profile[name].includes(item) : profile[name]===item;
+  return `<label class="choice"><input name="${name}" type="${multi?'checkbox':'radio'}" value="${item}" ${checked?'checked':''} ${!multi?'required':''}> ${item}</label>`;
+}).join('');
+const meals = {
+  'No preference':['Protein oats / Chicken quinoa bowl / Salmon and vegetables','Greek yoghurt bowl / Turkey wrap / Chicken stir-fry','Avocado toast / Tuna salad / Lean beef and rice','Eggs on toast / Chicken salad / Turkey chilli','Greek yoghurt and fruit / Tuna wrap / Baked cod and potatoes','Banana oats / Chicken pita / Beef and veg bowl','Scrambled eggs / Turkey sandwich / Salmon and rice'],
+  Vegetarian:['Greek yoghurt oats / Chickpea quinoa bowl / Tofu stir-fry','Eggs on toast / Hummus wrap / Bean chilli','Greek yoghurt and berries / Lentil salad / Veggie pasta','Banana oats / Egg and salad wrap / Chickpea curry','Avocado toast / Tofu bowl / Mushroom risotto','Greek yoghurt / Bean burrito / Halloumi and vegetables','Scrambled eggs / Lentil soup / Tofu and rice'],
+  Vegan:['Plant yoghurt oats / Chickpea quinoa bowl / Tofu stir-fry','Banana oats / Hummus wrap / Bean chilli','Avocado toast / Lentil salad / Veggie pasta','Berry oats / Bean wrap / Chickpea curry','Peanut butter toast / Tofu bowl / Mushroom rice','Plant yoghurt / Bean burrito / Lentil stew','Porridge / Lentil soup / Tofu and rice'],
+  Pescatarian:['Protein oats / Chickpea quinoa bowl / Salmon and vegetables','Greek yoghurt bowl / Tuna wrap / Tofu stir-fry','Avocado toast / Tuna salad / Baked cod and rice','Eggs on toast / Lentil salad / Chickpea curry','Banana oats / Salmon wrap / Fish and potatoes','Greek yoghurt / Bean burrito / Prawn rice','Scrambled eggs / Lentil soup / Salmon and rice']
+};
+const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const workouts = [
+  ['Monday · Lower body','Goblet squat, Romanian deadlift, reverse lunge, calf raise.'],
+  ['Tuesday · Upper body','Chest press, assisted chin-up, dumbbell row, shoulder press.'],
+  ['Wednesday · Core and conditioning','Dead bug, side plank, brisk walk or bike.'],
+  ['Thursday · Full body','Split squat, press-up, cable row, farmer carry.'],
+  ['Friday · Mobility and recovery','Easy walk, hip mobility, upper-back rotations.']
+];
+const skincare = [
+  ['Cleanser','Gentle cleanser · AM and PM'],['Toner','Optional hydrating toner · AM or PM'],
+  ['Serum','Optional niacinamide serum · AM or PM'],['Moisturiser','Lightweight moisturiser · AM and PM'],
+  ['SPF','Broad spectrum SPF 50 · AM']
+];
+const navLinks = [['dashboard','Home'],['diet','Nutrition'],['gym','Fitness'],['skin','Skincare'],['progress','Progress']];
+const page = (title,description,body) => `<h1 tabindex="-1">${title}</h1><p class="lead">${description}</p>${body}`;
+const tabState = {};
+function tabPage(route,title,description,panels) {
+  const selected = tabState[route] ?? 0;
+  return page(title,description,`<div class="tabs" aria-label="${title} sections">${panels.map(([label],index)=>`<button type="button" data-tab="${index}" aria-pressed="${index===selected}">${label}</button>`).join('')}</div>${panels[selected][1]}`);
+}
+const routes = {
+  home: () => `<section class="hero"><p class="eyebrow">HEALTHIER HABITS. HAPPIER YOU.</p><h1 tabindex="-1">Your health ally</h1><p class="lead">Personalised nutrition, fitness and skincare — all in one place.</p><div class="row">${link('questionnaire','Get started →')}${link('login','Log in',true)}</div></section><div class="grid">${card('Nutrition','Plan meals around your dietary preferences.')}${card('Fitness','Follow a weekly gym routine.')}${card('Skincare','Build a simple daily routine.')}${card('Progress','Track meals, steps, water and weight.')}</div>`,
+  login: () => page('Log in','Open your demo profile on this device.',`<a class="back" href="#home">← Back</a><form id="login-form" class="card"><label class="field">First name<input name="name" maxlength="40" value="${escapeText(profile.name)}" autocomplete="given-name" required></label><button>Continue</button></form>`),
+  questionnaire: () => page('Let’s personalise your plan','Step 1 of 2 · Tell us about your goals and preferences.',`<a class="back" href="#home">← Back</a><form id="questionnaire-form">
+    <label class="field">First name<input name="name" maxlength="40" value="${escapeText(profile.name)}" autocomplete="given-name" required></label>
+    <fieldset><legend>1. What is your main health goal?</legend>${choices('goal',['Lose weight','Build muscle','Maintain health','Improve skin','More energy','Other'])}</fieldset>
+    <fieldset><legend>2. Which skin concerns would you like to focus on?</legend>${choices('skin',['Acne','Dryness','Oiliness','Redness','Ageing','Uneven skin tone','Other'],true)}</fieldset>
+    <fieldset><legend>3. What are your dietary preferences?</legend>${choices('diet',['No preference','Vegetarian','Vegan','Pescatarian','Other'])}</fieldset>
+    <button>Next: Skin Scan →</button></form>`),
+  scan: () => page('Skin scan','Step 2 of 2 · Add a photo to try the scan preview.',`<a class="back" href="#questionnaire">← Back</a><div class="grid"><section class="card"><label class="field">Take or upload a photo<input id="skin-photo" type="file" accept="image/*"></label><img id="photo" class="photo" alt="Your selected skin photo" hidden><p id="photo-status" role="status"></p></section><section class="card"><h2>Scan preview</h2><p>Acne and blemishes, skin texture, redness, oiliness, hydration and fine lines.</p><p class="notice">Demo only. The photo stays in this tab and no skin measurements are generated.</p></section></div><div class="row"><button id="finish-scan" hidden>Continue to dashboard →</button><button id="skip-scan" class="secondary">Skip for now</button></div>`),
+  dashboard: () => page(`Good to see you, ${escapeText(profile.name)}`,'Here’s your personalised overview.',`<div class="grid">${card('Calories left',`<strong>${Math.max(0,2000-profile.calories)} kcal</strong>`)}${card('Protein', '<strong>114 g</strong>Sample daily intake')}${card('Workouts','<strong>4</strong>Sample sessions this week')}${card('Sleep','<strong>7.5 hrs</strong>Sample sleep log')}</div><h2>Your plans</h2><p class="muted">Goal · ${escapeText(profile.goal)}</p><div class="row">${link('diet','Diet plan',true)}${link('gym','Gym routine',true)}${link('skin','Skincare routine',true)}</div><br><h2>Today’s progress</h2>${track()}${link('progress','Edit progress',true)}`),
+  diet: () => tabPage('diet','Diet plans',`Sample weekly meal plan · ${escapeText(profile.diet)}`,[
+    ['Plan',`<div class="stack">${(meals[profile.diet] || meals['No preference']).map((meal,index)=>detail(days[index],meal.split(' / ').map((name,i)=>`${['Breakfast','Lunch','Dinner'][i]} · ${name}`).join('<br>'))).join('')}</div>`],
+    ['Nutrition',track()+link('progress','Log today’s intake',true)],
+    ['Meal prep',card('Prep for the week','Cook a batch of grains, portion your protein and wash vegetables. Label each container with the date.')]
+  ]),
+  gym: () => tabPage('gym','Gym routines','Sample weekly workout plan',[
+    ['Plan',`<div class="stack">${workouts.map(([title,body])=>detail(title,body)).join('')}</div>`],
+    ['Exercises',`<div class="stack">${detail('Goblet squat','Hold a dumbbell at chest height and lower under control.')}${detail('Chest press','Keep your feet planted and lower the weight slowly.')}${detail('Dumbbell row','Brace your torso and pull your elbow towards your hip.')}${detail('Farmer carry','Walk tall with a weight in each hand.')}</div>`],
+    ['Video guides',`<div class="stack">${['Goblet squat','Dumbbell chest press','Dumbbell row'].map(name=>`<p class="card"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(name+' exercise technique')}" target="_blank" rel="noopener noreferrer">${name} videos ↗</a></p>`).join('')}</div>`]
+  ]),
+  skin: () => tabPage('skin','Skincare routine',profile.skin.length ? `Selected concerns · ${profile.skin.map(escapeText).join(', ')}` : 'Your sample morning and evening routine.',[
+    ['Routine',`<div class="stack">${skincare.map(([name,body])=>detail(name,body)).join('')}</div>`],
+    ['Products',`<div class="grid">${skincare.map(([name,body])=>card(name,body)).join('')}</div>`],
+    ['Tips',card('Start with the basics','Use a gentle cleanser, moisturiser and daytime sunscreen. Introduce new products one at a time.')]
+  ]),
+  progress: () => tabPage('progress','Progress & settings','Track your daily activity and update your profile.',[
+    ['Progress',`${track()}<form class="card" id="metrics-form"><h2>Update today’s progress</h2>${metricFields()}<button>Save progress</button> <span role="status" id="save-status"></span></form><p></p>${link('questionnaire','Edit preferences',true)}`],
+    ['Nutrition',track()],
+    ['Body',`<div class="grid">${card('Weight',`<strong>${profile.weight} kg</strong>Latest entry`)}${card('Body fat','<strong>18%</strong>Sample reading')}${card('Skin progress','<strong>76%</strong>Sample skin score')}</div>`]
+  ])
+};
+function go(route) { location.hash = route; }
+function render(focus=true) {
+  const requested = location.hash.slice(1) || 'home';
+  const route = Object.hasOwn(routes,requested) ? requested : 'home';
+  screen.innerHTML = routes[route]();
+  navigation.hidden = !navLinks.some(([key])=>key===route);
+  navigation.innerHTML = `<div>${navLinks.map(([key,label])=>`<a href="#${key}" ${key===route?'aria-current="page"':''}>${label}</a>`).join('')}</div>`;
+  brand.href = profile.onboarded ? '#dashboard' : '#home';
+  if (focus) {
+    window.scrollTo(0,0);
+    screen.querySelector('h1').focus({preventScroll:true});
+  }
+  screen.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{
+    tabState[route] = Number(button.dataset.tab);
+    render(false);
+    screen.querySelector('[aria-pressed="true"]').focus();
+  }));
+  if (route==='scan' && photoUrl) showPhoto();
+}
+function showPhoto() {
+  const photo = document.querySelector('#photo');
+  photo.src = photoUrl;
+  photo.hidden = false;
+  document.querySelector('#finish-scan').hidden = false;
+}
+function clearPhoto() {
+  if (photoUrl) URL.revokeObjectURL(photoUrl);
+  photoUrl = '';
+}
+screen.addEventListener('change',event=>{
+  if(event.target.id!=='skin-photo') return;
+  clearPhoto();
+  const file = event.target.files[0];
+  const status = document.querySelector('#photo-status');
+  const preview = document.querySelector('#photo');
+  preview.hidden = true;
+  preview.removeAttribute('src');
+  document.querySelector('#finish-scan').hidden = true;
+  status.textContent = '';
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    status.textContent = 'Choose an image file.';
+    event.target.value = '';
+    return;
+  }
+  photoUrl = URL.createObjectURL(file);
+  preview.onload = () => {
+    preview.hidden = false;
+    document.querySelector('#finish-scan').hidden = false;
+    status.textContent = 'Photo preview ready.';
+  };
+  preview.onerror = () => {
+    clearPhoto();
+    status.textContent = 'This image could not be opened. Try a JPEG or PNG.';
+    event.target.value = '';
+  };
+  preview.src = photoUrl;
+});
+screen.addEventListener('click',event=>{
+  if (!['finish-scan','skip-scan'].includes(event.target.id)) return;
+  save({onboarded:true});
+  go('dashboard');
+});
+screen.addEventListener('submit',event=>{
+  event.preventDefault();
+  const data = new FormData(event.target);
+  if (event.target.id==='questionnaire-form') {
+    save({name:data.get('name').trim() || defaults.name,goal:data.get('goal'),skin:data.getAll('skin'),diet:data.get('diet')});
+    go('scan');
+  }
+  if (event.target.id==='login-form') {
+    save({name:data.get('name').trim() || defaults.name});
+    go(profile.onboarded ? 'dashboard' : 'questionnaire');
+  }
+  if (event.target.id==='metrics-form') {
+    save(Object.fromEntries([...data].map(([key,value])=>[key,Number(value)])));
+    screen.querySelectorAll('progress').forEach(bar=>{
+      const key = {'Nutrition':'calories','Steps':'steps','Water':'water'}[bar.getAttribute('aria-label')];
+      const value = profile[key];
+      bar.value = Math.min(value,bar.max);
+      const number = bar.parentElement.querySelector('strong');
+      const unit = {'calories':'kcal','steps':'steps','water':'L'}[key];
+      number.textContent = `${value.toLocaleString('en-GB')} ${unit}`;
+    });
+    document.querySelector('#save-status').textContent = 'Progress saved.';
+  }
+});
+window.addEventListener('hashchange',()=>{
+  if(location.hash!=='#scan') clearPhoto();
+  render();
+});
+render(false);
+</script>
+</body>
+</html>
